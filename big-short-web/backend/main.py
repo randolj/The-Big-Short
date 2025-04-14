@@ -28,3 +28,37 @@ def get_address_details(address: str = Query(...)):
     if row.empty:
         return {"error": "Address not found"}
     return row.to_dict(orient="records")[0]
+
+@app.get("/zip-properties")
+def get_properties_by_zip(zipcode: str = Query(...)):
+    try:
+        # Convert zipcode to integer for comparison with integer values in dataset
+        zipcode_int = int(zipcode)
+        
+        # Filter data by ZIP code (compare as integers)
+        filtered = csv_data[csv_data["PropertyAddressZIP"] == zipcode_int]
+        
+        print(f"ZIP code search: {zipcode_int}")
+        print(f"Found {len(filtered)} properties")
+        
+        if filtered.empty:
+            return {"properties": []}
+        
+        # Prepare the results
+        results = []
+        for _, row in filtered.iterrows():
+            try:
+                current_value = float(row["TaxMarketValueTotal"]) if pd.notna(row["TaxMarketValueTotal"]) else 0
+                predicted_value = current_value * 1.1  # Simple placeholder
+                
+                results.append({
+                    "address": row["PropertyAddressFull"],
+                    "current": current_value,
+                    "predicted": predicted_value
+                })
+            except Exception as e:
+                print(f"Error processing row: {e}")
+        
+        return {"properties": results}
+    except ValueError:
+        return {"properties": [], "error": "Invalid ZIP code format"}

@@ -102,17 +102,31 @@ function Home() {
 
 
 function ZipResults() {
-  const properties = [
-    { address: "123 Oak Street", current: 150000, predicted: 160000 },
-    { address: "456 Maple Avenue", current: 415000, predicted: 460000 },
-    { address: "789 Pine Lane", current: 289000, predicted: 310000 },
-    { address: "101 Birch Drive", current: 510000, predicted: 550000 },
-    { address: "555 Elm Boulevard", current: 460000, predicted: 420000 },
-  ];
+  const { zipcode } = useParams();
+  const [properties, setProperties] = useState([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    setLoading(true);
+    fetch(`http://localhost:8000/zip-properties?zipcode=${zipcode}`)
+      .then(res => res.json())
+      .then(data => {
+        setProperties(data.properties);
+        setLoading(false);
+      })
+      .catch(err => {
+        console.error("Error fetching ZIP properties:", err);
+        setLoading(false);
+      });
+  }, [zipcode]);
+
+  if (loading) return <div>Loading properties in ZIP {zipcode}...</div>;
+
+  if (properties.length === 0) return <div>No properties found in ZIP {zipcode}.</div>;
 
   return (
     <div>
-      <h2 className="section-title">List of Properties</h2>
+      <h2 className="section-title">Properties in ZIP {zipcode}</h2>
       <table className="results-table">
         <thead>
           <tr>
@@ -126,8 +140,8 @@ function ZipResults() {
           {properties.map((p, i) => (
             <tr key={i}>
               <td>{p.address}</td>
-              <td>${p.current.toLocaleString()}</td>
-              <td>${p.predicted.toLocaleString()}</td>
+              <td>${Math.round(p.current).toLocaleString()}</td>
+              <td>${Math.round(p.predicted).toLocaleString()}</td>
               <td>
                 {p.predicted > p.current ? "🔼" : p.predicted < p.current ? "🔽" : "⏺"}
               </td>
@@ -138,7 +152,6 @@ function ZipResults() {
     </div>
   );
 }
-
 function AddressResults() {
   const { address } = useParams();
   const [details, setDetails] = useState(null);
