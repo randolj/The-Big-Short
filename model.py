@@ -119,3 +119,6 @@ print(f"Decision Tree MAE: {tree_mae:.2f}")
 ### Sample Predictions ###
 nn_preds = model.predict(X_test)
 print(f"Sample Neural Net Predictions:\n{nn_preds[:5]}")
+
+# Save trained model
+model.save("property_value_model.keras")
