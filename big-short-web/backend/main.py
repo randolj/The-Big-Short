@@ -66,7 +66,8 @@ def predict_by_address(address: str):
     prediction = model.predict(scaled)[0][0]
     return {"predicted_value": round(float(prediction), 2)}
 
-
+# TODO: Show what attributes contributed to that predicted value
+# TODO: If the user doesn't give a value for predict, use average of all, or something along those lines
 
 @app.post("/predict")
 def predict(request: PredictionRequest):

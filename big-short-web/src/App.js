@@ -100,7 +100,6 @@ function Home() {
   );
 }
 
-
 function ZipResults() {
   const { zipcode } = useParams();
   const [properties, setProperties] = useState([]);
@@ -184,7 +183,7 @@ function AddressResults() {
         <strong>City:</strong> {details.PropertyAddressCity} <br />
         <strong>ZIP:</strong> {details.PropertyAddressZIP} <br />
         <strong>Year Built:</strong> {details.YearBuilt} <br />
-        <strong>Market Value:</strong> ${Number(details.TaxMarketValueTotal).toLocaleString()} <br />
+        <strong>Market Value:  </strong> ${Number(details.TaxMarketValueTotal).toLocaleString()} <br /> {/* TODO: Change to assessed value */}
         {estimatedValue && (
           <div className="result">
             Predicted Market Value: <strong>${Number(estimatedValue).toLocaleString()}</strong>
@@ -194,8 +193,6 @@ function AddressResults() {
     </div>
   );
 }
-
-
 
 function CustomValuation() {
   const [form, setForm] = useState({
