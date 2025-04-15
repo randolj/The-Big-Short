@@ -8,6 +8,8 @@ from sklearn.metrics import mean_absolute_error
 import tensorflow as tf
 from tensorflow import keras
 from tensorflow.keras import layers
+from keras.losses import MeanSquaredError
+from keras.metrics import MeanAbsoluteError
 
 # Load datasets
 property_df = pd.read_csv("Liberty_recorder_cleaned.csv")
@@ -91,7 +93,11 @@ model = keras.Sequential([
     layers.Dense(1)
 ])
 
-model.compile(optimizer="adam", loss="mse", metrics=["mae"])
+model.compile(
+    optimizer="adam",
+    loss=MeanSquaredError(),
+    metrics=[MeanAbsoluteError()]
+)
 
 # Train model
 model.fit(X_train, y_train, epochs=50, batch_size=32, validation_data=(X_test, y_test))
@@ -120,5 +126,13 @@ print(f"Decision Tree MAE: {tree_mae:.2f}")
 nn_preds = model.predict(X_test)
 print(f"Sample Neural Net Predictions:\n{nn_preds[:5]}")
 
-# Save trained model
-model.save("property_value_model.keras")
+model.save("liberty_model.h5")
+
+import joblib
+joblib.dump(scaler, "scaler.pkl")
+# Assuming df is your full DataFrame with features + target
+X = df.drop(columns=["TransferAmount"])  # drop the target
+y = df["TransferAmount"]
+
+# Save only feature column order
+joblib.dump(X.columns.tolist(), "model_columns.pkl")  # or "column_order.pkl"

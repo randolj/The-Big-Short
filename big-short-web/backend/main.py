@@ -1,6 +1,10 @@
 from fastapi import FastAPI, Query
-from fastapi.middleware.cors import CORSMiddleware
+from pydantic import BaseModel
+import tensorflow as tf
+import joblib
+import numpy as np
 import pandas as pd
+from fastapi.middleware.cors import CORSMiddleware
 
 app = FastAPI()
 
@@ -14,7 +18,64 @@ app.add_middleware(
 )
 
 # Load the CSV at startup
-csv_data = pd.read_csv("Miami-Dade_tax_assessor_cleaned.csv", low_memory=False)
+csv_data = pd.read_csv("Liberty_tax_assessor_cleaned.csv", low_memory=False)
+
+# Load model, scaler, and columns
+model = tf.keras.models.load_model("liberty_model.h5")
+scaler = joblib.load("scaler.pkl")
+column_order = joblib.load("model_columns.pkl")  # list of columns used during training
+
+class PredictionRequest(BaseModel):
+    size: float
+    bedrooms: int
+    bathrooms: int
+    age: int
+    stories: int
+    basement: int
+    hotWaterHeating: int
+    airConditioning: int
+    mainroad: int
+    frontage: float
+    depth: float
+    backyardSize: float
+    garage: int
+    distanceFromOcean: float
+
+# Input schema
+class HouseFeatures(BaseModel):
+    features: dict  # expects full feature dict
+
+@app.get("/predict-by-address")
+def predict_by_address(address: str):
+    # Locate the property by address
+    row = csv_data[csv_data["PropertyAddressFull"] == address]
+
+    if row.empty:
+        return {"error": "Address not found"}
+
+    # Only use feature columns
+    features_df = row[column_order] if set(column_order).issubset(row.columns) else row.reindex(columns=column_order, fill_value=0)
+
+    # Ensure proper column order and fill missing columns
+    features_df = features_df.fillna(0).reindex(columns=column_order, fill_value=0)
+
+    # Scale
+    scaled = scaler.transform(features_df)
+
+    # Predict
+    prediction = model.predict(scaled)[0][0]
+    return {"predicted_value": round(float(prediction), 2)}
+
+
+
+@app.post("/predict")
+def predict(request: PredictionRequest):
+    input_dict = request.dict()
+    df = pd.DataFrame([input_dict])
+    df = df.reindex(columns=column_order, fill_value=0)  # Match training data
+    scaled = scaler.transform(df)
+    prediction = model.predict(scaled)[0][0]
+    return {"predicted_value": round(float(prediction), 2)}
 
 @app.get("/search-addresses")
 def search_addresses(query: str = "", limit: int = 10):

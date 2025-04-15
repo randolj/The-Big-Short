@@ -142,12 +142,24 @@ function ZipResults() {
 function AddressResults() {
   const { address } = useParams();
   const [details, setDetails] = useState(null);
+  const [estimatedValue, setEstimatedValue] = useState(null); // <-- ADD THIS LINE
 
   useEffect(() => {
-    fetch(`http://localhost:8000/address-details?address=${encodeURIComponent(address)}`)
-      .then(res => res.json())
-      .then(data => setDetails(data))
-      .catch(err => console.error("Error fetching address details:", err));
+    async function fetchData() {
+      try {
+        const res = await fetch(`http://localhost:8000/address-details?address=${encodeURIComponent(address)}`);
+        const data = await res.json();
+        setDetails(data);
+  
+        const predRes = await fetch(`http://localhost:8000/predict-by-address?address=${encodeURIComponent(address)}`);
+        const predData = await predRes.json();
+        setEstimatedValue(predData.predicted_value);
+      } catch (err) {
+        console.error("Error:", err);
+      }
+    }
+  
+    fetchData();
   }, [address]);
 
   if (!details) return <div>Loading address info...</div>;
@@ -160,11 +172,16 @@ function AddressResults() {
         <strong>ZIP:</strong> {details.PropertyAddressZIP} <br />
         <strong>Year Built:</strong> {details.YearBuilt} <br />
         <strong>Market Value:</strong> ${Number(details.TaxMarketValueTotal).toLocaleString()} <br />
-        {/* Add more fields here as needed */}
+        {estimatedValue && (
+          <div className="result">
+            Predicted Market Value: <strong>${Number(estimatedValue).toLocaleString()}</strong>
+          </div>
+        )}
       </div>
     </div>
   );
 }
+
 
 
 function CustomValuation() {
@@ -190,10 +207,39 @@ function CustomValuation() {
     setForm({ ...form, [e.target.name]: e.target.value });
   };
 
-  const handleSubmit = (e) => {
+  const handleSubmit = async (e) => {
     e.preventDefault();
-    // Replace this with an API call to your model backend
-    setEstimatedValue("$350,000");
+  
+    try {
+      const response = await fetch("http://localhost:8000/predict", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json"
+        },
+        body: JSON.stringify({
+          size: parseFloat(form.size),
+          bedrooms: parseInt(form.bedrooms),
+          bathrooms: parseInt(form.bathrooms),
+          age: parseInt(form.age),
+          stories: parseInt(form.stories),
+          basement: parseInt(form.basement),
+          hotWaterHeating: parseInt(form.hotWaterHeating),
+          airConditioning: parseInt(form.airConditioning),
+          mainroad: parseInt(form.mainroad),
+          frontage: parseFloat(form.frontage),
+          depth: parseFloat(form.depth),
+          backyardSize: parseFloat(form.backyardSize),
+          garage: parseInt(form.garage),
+          distanceFromOcean: parseFloat(form.distanceFromOcean)
+        })
+      });
+  
+      const data = await response.json();
+      setEstimatedValue(`$${Number(data.predicted_value).toLocaleString()}`);
+    } catch (error) {
+      console.error("Prediction error:", error);
+      setEstimatedValue("Error calculating value.");
+    }
   };
 
   return (
