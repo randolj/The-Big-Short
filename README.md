@@ -1,3 +1,9 @@
+## Installing requirements
+
+   ```bash
+   pip install requirements.txt
+   ```
+
 ## Generating Model Files
 
 1. From the root of the project (`The-Big-Short`), run the model generation script:
