@@ -154,7 +154,9 @@ function ZipResults() {
 function AddressResults() {
   const { address } = useParams();
   const [details, setDetails] = useState(null);
-  const [estimatedValue, setEstimatedValue] = useState(null); // <-- ADD THIS LINE
+  const [estimatedValue, setEstimatedValue] = useState(null);
+  const [featureInputs, setFeatureInputs] = useState(null);
+
 
   useEffect(() => {
     async function fetchData() {
@@ -166,6 +168,7 @@ function AddressResults() {
         const predRes = await fetch(`http://localhost:8000/predict-by-address?address=${encodeURIComponent(address)}`);
         const predData = await predRes.json();
         setEstimatedValue(predData.predicted_value);
+        setFeatureInputs(predData.features);
       } catch (err) {
         console.error("Error:", err);
       }
@@ -183,10 +186,23 @@ function AddressResults() {
         <strong>City:</strong> {details.PropertyAddressCity} <br />
         <strong>ZIP:</strong> {details.PropertyAddressZIP} <br />
         <strong>Year Built:</strong> {details.YearBuilt} <br />
-        <strong>Market Value:  </strong> ${Number(details.TaxMarketValueTotal).toLocaleString()} <br /> {/* TODO: Change to assessed value */}
+        <strong>Assessed Value:  </strong> ${Number(details.TaxMarketValueTotal).toLocaleString()} <br />
         {estimatedValue && (
           <div className="result">
             Predicted Market Value: <strong>${Number(estimatedValue).toLocaleString()}</strong>
+          </div>
+        )}
+        {featureInputs && (
+          <div className="mt-4">
+            <h3 className="section-title">Key Home Attributes</h3>
+            <ul className="about-text">
+              <li><strong>Year Built:</strong> {featureInputs.YearBuilt}</li>
+              <li><strong>Pool:</strong> {featureInputs.Pool === 1 ? "Yes" : "No"}</li>
+              <li><strong>Lot Size:</strong> {Number(featureInputs.AreaLotSF).toLocaleString()} sq ft</li>
+              <li><strong>Bathrooms:</strong> {featureInputs.BathCount}</li>
+              <li><strong>Bedrooms:</strong> {featureInputs.BedroomsCount}</li>
+              <li><strong>Stories:</strong> {featureInputs.StoriesCount}</li>
+            </ul>
           </div>
         )}
       </div>
@@ -199,7 +215,7 @@ function CustomValuation() {
     size: "",
     bedrooms: "",
     bathrooms: "",
-    age: "",
+    yearBuilt: "",
     stories: "",
     basement: "",
     hotWaterHeating: "",
@@ -220,37 +236,32 @@ function CustomValuation() {
   const handleSubmit = async (e) => {
     e.preventDefault();
   
+    const formattedForm = Object.fromEntries(
+      Object.entries(form).map(([k, v]) => [k, v === "" ? null : isNaN(v) ? v : +v])
+    );
+  
     try {
       const response = await fetch("http://localhost:8000/predict", {
         method: "POST",
         headers: {
           "Content-Type": "application/json"
         },
-        body: JSON.stringify({
-          size: parseFloat(form.size),
-          bedrooms: parseInt(form.bedrooms),
-          bathrooms: parseInt(form.bathrooms),
-          age: parseInt(form.age),
-          stories: parseInt(form.stories),
-          basement: parseInt(form.basement),
-          hotWaterHeating: parseInt(form.hotWaterHeating),
-          airConditioning: parseInt(form.airConditioning),
-          mainroad: parseInt(form.mainroad),
-          frontage: parseFloat(form.frontage),
-          depth: parseFloat(form.depth),
-          backyardSize: parseFloat(form.backyardSize),
-          garage: parseInt(form.garage),
-          distanceFromOcean: parseFloat(form.distanceFromOcean)
-        })
+        body: JSON.stringify(formattedForm)
       });
   
       const data = await response.json();
-      setEstimatedValue(`$${Number(data.predicted_value).toLocaleString()}`);
+  
+      if (data.error) {
+        setEstimatedValue("Error calculating value.");
+      } else {
+        setEstimatedValue(`$${Number(data.predicted_value).toLocaleString()}`);
+      }
     } catch (error) {
       console.error("Prediction error:", error);
       setEstimatedValue("Error calculating value.");
     }
   };
+  
 
   return (
     <div>
