@@ -49,6 +49,12 @@ def remove_columns_and_invalid_rows(input_file, columns_to_remove, critical_colu
     # Remove rows where ArmsLengthFlag is > 1 or NaN
     df = df[df['ArmsLengthFlag'].isin([0, 1])]
 
+    # Ensure TransferAmount is numeric
+    df['TransferAmount'] = pd.to_numeric(df['TransferAmount'], errors='coerce')
+
+    # Drop rows where TransferAmount is 0 or NaN
+    df = df[df['TransferAmount'] > 0]
+
     # Filter out top 1% and bottom 1% TransferAmount
     if 'TransferAmount' in df.columns:
         lower_bound = df['TransferAmount'].quantile(0.01)
@@ -109,7 +115,7 @@ critical_columns = [
 #kick out top 1% and bottom 1% based on property value
 
 # Example usage
-input_csv = "Recorder_Miami-Dade.csv"  # Use your actual file here
+input_csv = "Recorder_Liberty.csv"  # Use your actual file here
 remove_columns_and_invalid_rows(input_csv, columns_to_remove, critical_columns)
 
 #transferinfopurchasetypecode, 
