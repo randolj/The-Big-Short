@@ -55,12 +55,13 @@ def remove_columns_and_invalid_rows(input_file, columns_to_remove, critical_colu
         upper_bound = df['TransferAmount'].quantile(0.99)
         df = df[(df['TransferAmount'] >= lower_bound) & (df['TransferAmount'] <= upper_bound)]
 
+    # Drop the specified columns
+    df.drop(columns=[col for col in columns_to_remove if col in df.columns], inplace=True)
+
+    # Drop any final helper columns used for filtering
+    df.drop(columns=["ArmsLengthFlag", "PropertyUseGroup"], inplace=True, errors='ignore')
     
     # Save the modified DataFrame back to CSV
-    df.to_csv(output_file, index=False)
-    print(f"Updated CSV saved as {output_file}")
-
-        # Save the modified DataFrame back to CSV
     df.to_csv(output_file, index=False)
     print(f"Updated CSV saved as {output_file}")
 
@@ -88,7 +89,7 @@ columns_to_remove = [
     "Mortgage2LenderNameFullStandardized","Mortgage2LenderNameFirst","Mortgage2LenderNameLast",
     "Mortgage2LenderAddress","Mortgage2LenderInfoEntityClassification","Mortgage2LenderInfoSellerCarryBackFlag",
     "Mortgage2Term","Mortgage2TermType","Mortgage2TermDate","Mortgage2InfoPrepaymentPenaltyFlag",
-    "Mortgage2InfoPrepaymentTerm","Mortgage2InterestRateType"
+    "Mortgage2InfoPrepaymentTerm","Mortgage2InterestRateType", "PropertyAddressInfoFormat","RecorderMapReference"
 ]
 
 # Critical columns required for price prediction
