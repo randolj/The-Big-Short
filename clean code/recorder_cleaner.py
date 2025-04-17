@@ -20,6 +20,12 @@ def remove_columns_and_invalid_rows(input_file, columns_to_remove, critical_colu
     # Remove rows where any critical column has 'NA'
     df = df.dropna(subset=critical_columns)
 
+    # Keep only rows where PropertyUseGroup is "Residential"
+    if 'PropertyUseGroup' in df.columns:
+        df = df[df['PropertyUseGroup'].str.lower() == 'residential']
+    else:
+        print("Column 'PropertyUseGroup' not found. Proceeding without Residential filtering.")
+
     # Convert ArmsLengthFlag to numeric (handle cases where it's not already)
     df['ArmsLengthFlag'] = pd.to_numeric(df['ArmsLengthFlag'], errors='coerce')
 
