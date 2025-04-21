@@ -137,8 +137,8 @@ def get_address_details(address: str = Query(...)):
 def get_properties_by_zip(zipcode: str = Query(...)):
     try:
         zipcode_int = int(zipcode)
-        filtered = csv_data[csv_data["PropertyAddressZIP"] == zipcode_int]
-
+        filtered = filter_valid_properties(csv_data)
+        filtered = filtered[filtered["PropertyAddressZIP"] == zipcode_int]
         if filtered.empty:
             return {"properties": []}
 
@@ -160,3 +160,37 @@ def get_properties_by_zip(zipcode: str = Query(...)):
         return {"properties": results}
     except ValueError:
         return {"properties": [], "error": "Invalid ZIP code format"}
+
+import random
+
+@app.get("/random-properties")
+def get_random_properties(count: int = 3):
+    filtered = filter_valid_properties(csv_data)
+
+    sample = filtered.sample(n=min(count, len(filtered)))
+
+    results = []
+    for _, row in sample.iterrows():
+        try:
+            current_value = float(row["TaxMarketValueTotal"])
+            predicted_value = current_value * random.uniform(0.95, 1.15)
+            results.append({
+                "address": row["PropertyAddressFull"],
+                "city": row["PropertyAddressCity"],
+                "zip": row["PropertyAddressZIP"],
+                "current": current_value,
+                "predicted": round(predicted_value, 2),
+            })
+        except:
+            continue
+
+    return {"properties": results}
+
+def filter_valid_properties(df):
+    return df[
+        (df["TaxMarketValueTotal"] > 10000) &
+        (df["PropertyAddressFull"].notna()) &
+        (df["PropertyAddressFull"].str.strip().str.upper().isin(["", "0", "UNKNOWN"]) == False) &
+        (df["PropertyAddressCity"].notna()) &
+        (df["PropertyAddressZIP"].notna())
+    ]
