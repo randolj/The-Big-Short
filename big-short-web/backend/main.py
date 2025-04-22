@@ -19,11 +19,8 @@ app.add_middleware(
 )
 
 # Load data and model artifacts
-csv_data = pd.read_csv("Liberty_tax_assessor_cleaned.csv", low_memory=False)
-model = tf.keras.models.load_model("liberty_model.h5")
-scaler = joblib.load("scaler.pkl")
-column_order = joblib.load("model_columns.pkl")  # List of features used during training
-
+csv_data = pd.read_csv("Miami-Dade_tax_assessor_cleaned.csv", low_memory=False)
+model = joblib.load("Miami-Dade_NeuralNetwork_final_model_pipeline.pkl")
 
 class PredictionRequest(BaseModel):
     size: Optional[float] = None
@@ -41,11 +38,18 @@ class PredictionRequest(BaseModel):
     garage: Optional[int] = None
     distanceFromOcean: Optional[float] = None
 
-
-def prepare_input(row: pd.DataFrame) -> np.ndarray:
-    """Ensure correct column order, fill missing values, and scale input."""
-    row = row.reindex(columns=column_order, fill_value=0).fillna(0)
-    return scaler.transform(row)
+def engineer_features(df: pd.DataFrame) -> pd.DataFrame:
+    df = df.copy()
+    df["PropertyAge"] = 2023 - df["YearBuilt"]
+    df["TotalBathCount"] = df["BathCount"] + 0.5 * df["BathPartialCount"].fillna(0)
+    df["AreaPerBedroom"] = df["AreaBuilding"] / df["BedroomsCount"].replace(0, 1)
+    df["PricePerSqFt"] = df["AssessorLastSaleAmount"] / df["AreaBuilding"].replace(0, np.nan)
+    df["AmenityScore"] = 0  # Simplified — or reimplement your full scoring logic
+    df["GeographicCluster"] = 0  # Simplified — or use KMeans
+    df["PriceLocationCluster"] = 0  # Simplified — or use KMeans
+    df["AreaBuilding_log"] = np.log1p(df.get("AreaBuilding", 0))
+    df["AreaLotSF_log"] = np.log1p(df.get("AreaLotSF", 0))
+    return df
 
 
 @app.get("/predict-by-address")
@@ -55,66 +59,54 @@ def predict_by_address(address: str):
     if row.empty:
         return {"error": "Address not found"}
 
-    features_df = (
-        row[column_order]
-        if set(column_order).issubset(row.columns)
-        else row.reindex(columns=column_order, fill_value=0)
-    )
-    scaled = prepare_input(features_df)
-    prediction = model.predict(scaled)[0][0]
+    row = row.loc[:, ~row.columns.duplicated()]
+    row = engineer_features(row)
 
-    # Only include selected useful features
-    important_keys = [
-        "YearBuilt",
-        "Pool",
-        "AreaLotSF",
-        "BathCount",
-        "BedroomsCount",
-        "StoriesCount",
-    ]
-    filtered_features = {
-        key: features_df.iloc[0][key]
-        for key in important_keys
-        if key in features_df.columns
-    }
-
-    return {
-        "predicted_value": round(float(prediction), 2),
-        "features": filtered_features,
-    }
-
-
-# TODO: If the user doesn't give a value for predict, use average of all, or something along those lines (kinda working, just returns the same value)
-
-
-@app.post("/predict")
-def predict(request: PredictionRequest):
     try:
-        input_data = request.dict()
-        df = pd.DataFrame([input_data])
-        df = df.reindex(columns=column_order)
-        df = df.loc[:, ~df.columns.duplicated()]  # Remove duplicate columns
+        prediction = model.predict(row)[0]
 
-        for col in df.columns:
-            val = df[col].iloc[0]
-            if pd.isna(val):
-                if col in csv_data.columns and pd.api.types.is_numeric_dtype(
-                    csv_data[col]
-                ):
-                    df.at[0, col] = csv_data[col].dropna().mean()
-                else:
-                    df.at[0, col] = 0
+        important_keys = [
+            "YearBuilt",
+            "Pool",
+            "AreaLotSF",
+            "BathCount",
+            "BedroomsCount",
+            "StoriesCount",
+        ]
+        filtered_features = {
+            key: row.iloc[0][key]
+            for key in important_keys
+            if key in row.columns
+        }
 
-        print("✅ Final model input:", df.to_dict(orient="records")[0])
-
-        scaled = prepare_input(df)
-        prediction = model.predict(scaled)[0][0]
-
-        return {"predicted_value": round(float(prediction), 2)}
+        return {
+            "predicted_value": round(float(prediction), 2),
+            "features": {
+                k: v.item() if isinstance(v, np.generic) else v
+                for k, v in filtered_features.items()
+            },
+        }
     except Exception as e:
         print("🔥 Prediction error:", e)
         return {"error": "Prediction failed."}
 
+
+
+@app.post("/predict")
+def predict(request: PredictionRequest):
+    input_data = request.dict()
+    df = pd.DataFrame([input_data])
+    df = df.loc[:, ~df.columns.duplicated()]
+
+    for col in df.columns:
+        if pd.isna(df.at[0, col]):
+            df.at[0, col] = 0
+
+    # ✅ Add this line:
+    df = engineer_features(df)
+
+    print("✅ Final model input:", df.to_dict(orient="records")[0])
+    prediction = model.predict(df)[0]
 
 @app.get("/search-addresses")
 def search_addresses(query: str = "", limit: int = 10):
@@ -166,22 +158,30 @@ import random
 @app.get("/random-properties")
 def get_random_properties(count: int = 3):
     filtered = filter_valid_properties(csv_data)
-
     sample = filtered.sample(n=min(count, len(filtered)))
 
     results = []
     for _, row in sample.iterrows():
         try:
-            current_value = float(row["TaxMarketValueTotal"])
-            predicted_value = current_value * random.uniform(0.95, 1.15)
+            # Convert single row to DataFrame for processing
+            row_df = pd.DataFrame([row])
+            row_df = row_df.loc[:, ~row_df.columns.duplicated()]  # clean up
+
+            # Apply feature engineering
+            row_df = engineer_features(row_df)
+
+            # Get model prediction
+            predicted_value = model.predict(row_df)[0]
+
             results.append({
                 "address": row["PropertyAddressFull"],
                 "city": row["PropertyAddressCity"],
                 "zip": row["PropertyAddressZIP"],
-                "current": current_value,
-                "predicted": round(predicted_value, 2),
+                "current": float(row["TaxMarketValueTotal"]),
+                "predicted": round(float(predicted_value), 2),
             })
-        except:
+        except Exception as e:
+            print(f"🔥 Error predicting row: {e}")
             continue
 
     return {"properties": results}
