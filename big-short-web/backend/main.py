@@ -20,7 +20,7 @@ app.add_middleware(
 
 # Load data and model artifacts
 csv_data = pd.read_csv("Miami-Dade_tax_assessor_cleaned.csv", low_memory=False)
-model = joblib.load("Miami-Dade_NeuralNetwork_final_model_pipeline.pkl")
+model = joblib.load("Miami-Dade_GradientBoosting_final_model_pipeline.pkl")
 
 class PredictionRequest(BaseModel):
     size: Optional[float] = None
