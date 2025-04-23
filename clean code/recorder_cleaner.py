@@ -115,7 +115,7 @@ critical_columns = [
 #kick out top 1% and bottom 1% based on property value
 
 # Example usage
-input_csv = "Recorder_Liberty.csv"  # Use your actual file here
+input_csv = "Recorder_Miami-Dade.csv"  # Use your actual file here
 remove_columns_and_invalid_rows(input_csv, columns_to_remove, critical_columns)
 
 #transferinfopurchasetypecode, 
